@@ -30,3 +30,26 @@ class GaussianNaiveBayes:
             # adding small value close to zero so i never get error for diving by zero
             self.variances[index, :] = X_c.var(axis=0) + 1e-9
             self.priors[index] = X_c.shape[0]/X.shape[0]
+
+    def _gaussian_likelihood(self, class_idx, x):
+        """
+        Compute log likelihood for a sample x given class_idx
+        """
+        mean = self.means[class_idx]
+        var = self.variances[class_idx]
+        # Gaussian PDF log form
+        log_prob = -0.5 * np.sum(np.log(2. * np.pi * var))
+        log_prob -= 0.5 * np.sum(((x - mean) ** 2) / var)
+        return log_prob
+
+    def predict(self, X):
+        y_pred = []
+        for x in X:
+            posteriors = []
+            for idx, c in enumerate(self.classes):
+                prior = np.log(self.priors[idx])
+                likelihood = self._gaussian_likelihood(idx, x)
+                posterior = prior + likelihood
+                posteriors.append(posterior)
+            y_pred.append(self.classes[np.argmax(posteriors)])
+        return np.array(y_pred)

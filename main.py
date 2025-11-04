@@ -4,6 +4,11 @@ import numpy as np
 from torch.utils.data import Subset, DataLoader
 import torch.nn as nn
 import torch
+from DecisionTree import DecisionTree
+
+from NaiveBayes import GaussianNaiveBayes
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import accuracy_score
 
 # Telling the model what size to covert images to and normalizing them
 transform = transforms.Compose([
@@ -69,11 +74,28 @@ def extract_features(data_loader):
     # concatinate all the arrays so we only have one to search thru
     return torch.cat(features), torch.cat(labels)
 
-#extract features
+
+# extract features
 training_features, training_labels = extract_features(training_loader)
 test_features, test_labels = extract_features(test_loader)
 
+gnb = GaussianNaiveBayes()
+gnb.fit(training_features.cpu().numpy(), training_labels.cpu().numpy())
 
-print(training_subset)
-print(test_subset)
+y_pred = gnb.predict(test_features.cpu().numpy())
+accuracy = np.mean(y_pred == test_labels.cpu().numpy())
+
+print("Gaussian Naive Bayes Accuracy:", accuracy)
 print()
+
+# tree = DecisionTree(max_depth=10)
+# tree.fit(training_features.cpu().numpy(), training_labels.cpu().numpy())
+# y_pred = tree.predict(test_features.cpu().numpy())
+# accuracy = np.mean(y_pred == test_labels.cpu().numpy())
+# print("Decision Tree Accuracy:", accuracy)
+
+tree = DecisionTreeClassifier(criterion="gini", max_depth=2)
+tree.fit(training_features.cpu().numpy(), training_labels.cpu().numpy())
+y_pred = tree.predict(test_features.cpu().numpy())
+accuracy= accuracy_score(test_labels.cpu().numpy(),y_pred)
+print("Decision Tree Scikit-Learn:", accuracy)
