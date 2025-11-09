@@ -1,3 +1,4 @@
+from sklearn.decomposition import PCA
 import torchvision
 import torchvision.transforms as transforms
 import numpy as np
@@ -8,7 +9,8 @@ from DecisionTree import DecisionTree
 
 from NaiveBayes import GaussianNaiveBayes
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
+from sklearn.naive_bayes import GaussianNB
 
 # Telling the model what size to covert images to and normalizing them
 transform = transforms.Compose([
@@ -79,23 +81,69 @@ def extract_features(data_loader):
 training_features, training_labels = extract_features(training_loader)
 test_features, test_labels = extract_features(test_loader)
 
+pca = PCA(n_components=50)
+training_features = pca.fit_transform(training_features.cpu().numpy())
+test_features = pca.transform(test_features.cpu().numpy())
+y_true = test_labels.cpu().numpy() if hasattr(
+    test_labels, "cpu") else test_labels
+
 gnb = GaussianNaiveBayes()
-gnb.fit(training_features.cpu().numpy(), training_labels.cpu().numpy())
+gnb.fit(training_features, training_labels)
 
-y_pred = gnb.predict(test_features.cpu().numpy())
+y_pred = gnb.predict(test_features)
 accuracy = np.mean(y_pred == test_labels.cpu().numpy())
+precision = precision_score(y_true, y_pred, average='weighted')
+recall = recall_score(y_true, y_pred, average='weighted')
+f1 = f1_score(y_true, y_pred, average='weighted')
 
-print("Gaussian Naive Bayes Accuracy:", accuracy)
+print("Gaussian Naive Bayes")
+print(f"  Accuracy : {accuracy:.4f}")
+print(f"  Precision: {precision:.4f}")
+print(f"  Recall   : {recall:.4f}")
+print(f"  F1-score : {f1:.4f}")
 print()
 
-# tree = DecisionTree(max_depth=10)
-# tree.fit(training_features.cpu().numpy(), training_labels.cpu().numpy())
-# y_pred = tree.predict(test_features.cpu().numpy())
-# accuracy = np.mean(y_pred == test_labels.cpu().numpy())
-# print("Decision Tree Accuracy:", accuracy)
+gnb = GaussianNB()
+gnb.fit(training_features, training_labels)
+y_pred = gnb.predict(test_features)
+accuracy = accuracy_score(test_labels, y_pred)
+precision = precision_score(test_labels, y_pred, average='weighted')
+recall = recall_score(test_labels, y_pred, average='weighted')
+f1 = f1_score(test_labels, y_pred, average='weighted')
 
-tree = DecisionTreeClassifier(criterion="gini", max_depth=2)
-tree.fit(training_features.cpu().numpy(), training_labels.cpu().numpy())
-y_pred = tree.predict(test_features.cpu().numpy())
-accuracy= accuracy_score(test_labels.cpu().numpy(),y_pred)
-print("Decision Tree Scikit-Learn:", accuracy)
+print("Gaussian Naive Bayes Scikit-Learn:")
+print(f"  Accuracy : {accuracy:.4f}")
+print(f"  Precision: {precision:.4f}")
+print(f"  Recall   : {recall:.4f}")
+print(f"  F1-score : {f1:.4f}")
+print()
+
+for depth in [100, 50, 25, 10, 5, 2, 1]:
+
+    tree = DecisionTree(max_depth=depth)
+    tree.fit(training_features, training_labels)
+    y_pred = tree.predict(test_features)
+    accuracy = np.mean(y_pred == test_labels.cpu().numpy())
+    precision = precision_score(y_true, y_pred, average='weighted')
+    recall = recall_score(y_true, y_pred, average='weighted')
+    f1 = f1_score(y_true, y_pred, average='weighted')
+
+    print(f"Decision Tree (MaxDepth={depth})")
+    print(f"  Accuracy : {accuracy:.4f}")
+    print(f"  Precision: {precision:.4f}")
+    print(f"  Recall   : {recall:.4f}")
+    print(f"  F1-score : {f1:.4f}")
+
+    tree = DecisionTreeClassifier(criterion="gini", max_depth=depth)
+    tree.fit(training_features, training_labels)
+    y_pred = tree.predict(test_features)
+    accuracy = accuracy_score(test_labels, y_pred)
+    precision = precision_score(test_labels, y_pred, average='weighted')
+    recall = recall_score(test_labels, y_pred, average='weighted')
+    f1 = f1_score(test_labels, y_pred, average='weighted')
+
+    print(f"Decision Tree (MaxDepth={depth}) Scikit-Learn:")
+    print(f"  Accuracy : {accuracy:.4f}")
+    print(f"  Precision: {precision:.4f}")
+    print(f"  Recall   : {recall:.4f}")
+    print(f"  F1-score : {f1:.4f}")
