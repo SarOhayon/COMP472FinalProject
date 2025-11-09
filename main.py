@@ -1,101 +1,103 @@
-import torchvision
-import torchvision.transforms as transforms
 import numpy as np
-from torch.utils.data import Subset, DataLoader
-import torch.nn as nn
 import torch
-from DecisionTree import DecisionTree
-
-from NaiveBayes import GaussianNaiveBayes
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.metrics import accuracy_score
+from sklearn.naive_bayes import GaussianNB
+from MLP import MLP
+from CNN import VGG11
+import joblib
 
-# Telling the model what size to covert images to and normalizing them
+# --- Load preprocessed PCA features (for NB, DT, MLP) ---
+X_train = np.load('features/train_features.npy')
+X_test = np.load('features/test_features.npy')
+y_train = np.load('features/train_labels.npy')
+y_test = np.load('features/test_labels.npy')
+
+# ============================================================
+# 1️⃣ NAIVE BAYES
+# ============================================================
+nb = GaussianNB()
+nb.fit(X_train, y_train)
+y_pred_nb = nb.predict(X_test)
+
+acc_nb = accuracy_score(y_test, y_pred_nb)
+prec_nb = precision_score(y_test, y_pred_nb, average='macro')
+rec_nb = recall_score(y_test, y_pred_nb, average='macro')
+f1_nb = f1_score(y_test, y_pred_nb, average='macro')
+
+# ============================================================
+# 2️⃣ DECISION TREE
+# ============================================================
+dt = DecisionTreeClassifier(criterion='gini', max_depth=50, random_state=42)
+dt.fit(X_train, y_train)
+y_pred_dt = dt.predict(X_test)
+
+acc_dt = accuracy_score(y_test, y_pred_dt)
+prec_dt = precision_score(y_test, y_pred_dt, average='macro')
+rec_dt = recall_score(y_test, y_pred_dt, average='macro')
+f1_dt = f1_score(y_test, y_pred_dt, average='macro')
+
+# ============================================================
+# 3️⃣ MULTI-LAYER PERCEPTRON (MLP)
+# ============================================================
+from torch import nn
+
+mlp = MLP()
+mlp.load_state_dict(torch.load("mlp_model.pt"))
+mlp.eval()
+
+X_test_tensor = torch.tensor(X_test, dtype=torch.float32)
+with torch.no_grad():
+    preds_mlp = mlp(X_test_tensor)
+    y_pred_mlp = torch.argmax(preds_mlp, dim=1).numpy()
+
+acc_mlp = accuracy_score(y_test, y_pred_mlp)
+prec_mlp = precision_score(y_test, y_pred_mlp, average='macro')
+rec_mlp = recall_score(y_test, y_pred_mlp, average='macro')
+f1_mlp = f1_score(y_test, y_pred_mlp, average='macro')
+
+# ============================================================
+# 4️⃣ CONVOLUTIONAL NEURAL NETWORK (CNN – VGG11)
+# ============================================================
+import torchvision
+import torch.nn as nn
+from torchvision import transforms, datasets
+from torch.utils.data import DataLoader
+
 transform = transforms.Compose([
-    transforms.Resize((224, 224)),
     transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
-# loading CIFAR10 dataset. Loading the training and test sets from this dataset
-training_set = torchvision.datasets.CIFAR10(
-    root='./data', train=True, download=True, transform=transform)
-test_set = torchvision.datasets.CIFAR10(
-    root='./data', train=False, download=True, transform=transform)
-print(training_set)
-print(test_set)
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+])
+test_data = datasets.CIFAR10(root='./data', train=False, download=False, transform=transform)
+test_loader = DataLoader(test_data, batch_size=64, shuffle=False)
 
-# create a subset from a datset with num_per_class items for each class
-
-
-def subset_by_class(dataset, num_per_class):
-    targets = np.array(dataset.targets)
-    indices = []
-    for cls in range(len(dataset.classes)):
-        cls_idx = np.where(targets == cls)[0][:num_per_class]
-        indices.extend(cls_idx)
-    return Subset(dataset, indices)
-
-
-# subsetting the both datasets as specifed in Assignment
-training_subset = subset_by_class(training_set, 500)
-test_subset = subset_by_class(test_set, 100)
-
-# splits it into batches of 64 cuz it makes it faster
-# training:
-training_loader = DataLoader(
-    training_subset, batch_size=64, shuffle=False, num_workers=0)
-# test:
-test_loader = DataLoader(
-    test_subset, batch_size=64, shuffle=False, num_workers=0)
-
-# Load the resnet18 pre-trianed model
-# Remove the last classifcation layer so I can do the classification myself
-resnet18 = torchvision.models.resnet18(pretrained=True)
-resnet18 = nn.Sequential(*list(resnet18.children())[:-1])
-# prepares the model
-resnet18.eval()
-# puts the model on the cpu (i dont have gpu)
 device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
-resnet18.to(device)
 
-# loop to extract features from our images (512x1 vector)
+cnn = VGG11().to(device)
+cnn.load_state_dict(torch.load("cnn_model.pt", map_location=device))
+cnn.eval()
 
+y_true, y_pred_cnn = [], []
+with torch.no_grad():
+    for images, labels in test_loader:
+        images = images.to(device)
+        outputs = cnn(images)
+        preds = torch.argmax(outputs, dim=1).cpu().numpy()
+        y_pred_cnn.extend(preds)
+        y_true.extend(labels.numpy())
 
-def extract_features(data_loader):
-    features = []
-    labels = []
-    with torch.no_grad():
-      # looping over our dataset
-        for images, targets in data_loader:
-            images = images.to(device)
-            # passing the images thru the model -> result should be an array of features
-            feats = resnet18(images).squeeze()
-            features.append(feats)
-            labels.append(targets)
-    # concatinate all the arrays so we only have one to search thru
-    return torch.cat(features), torch.cat(labels)
+acc_cnn = accuracy_score(y_true, y_pred_cnn)
+prec_cnn = precision_score(y_true, y_pred_cnn, average='macro')
+rec_cnn = recall_score(y_true, y_pred_cnn, average='macro')
+f1_cnn = f1_score(y_true, y_pred_cnn, average='macro')
 
-
-# extract features
-training_features, training_labels = extract_features(training_loader)
-test_features, test_labels = extract_features(test_loader)
-
-gnb = GaussianNaiveBayes()
-gnb.fit(training_features.cpu().numpy(), training_labels.cpu().numpy())
-
-y_pred = gnb.predict(test_features.cpu().numpy())
-accuracy = np.mean(y_pred == test_labels.cpu().numpy())
-
-print("Gaussian Naive Bayes Accuracy:", accuracy)
-print()
-
-# tree = DecisionTree(max_depth=10)
-# tree.fit(training_features.cpu().numpy(), training_labels.cpu().numpy())
-# y_pred = tree.predict(test_features.cpu().numpy())
-# accuracy = np.mean(y_pred == test_labels.cpu().numpy())
-# print("Decision Tree Accuracy:", accuracy)
-
-tree = DecisionTreeClassifier(criterion="gini", max_depth=2)
-tree.fit(training_features.cpu().numpy(), training_labels.cpu().numpy())
-y_pred = tree.predict(test_features.cpu().numpy())
-accuracy= accuracy_score(test_labels.cpu().numpy(),y_pred)
-print("Decision Tree Scikit-Learn:", accuracy)
+# ============================================================
+# 🧾 FINAL RESULTS TABLE
+# ============================================================
+print("\n📊 FINAL MODEL COMPARISON RESULTS:\n")
+print(f"{'Model':<20}{'Accuracy':<12}{'Precision':<12}{'Recall':<12}{'F1-Score':<12}")
+print("-" * 68)
+print(f"{'Naive Bayes':<20}{acc_nb:<12.4f}{prec_nb:<12.4f}{rec_nb:<12.4f}{f1_nb:<12.4f}")
+print(f"{'Decision Tree':<20}{acc_dt:<12.4f}{prec_dt:<12.4f}{rec_dt:<12.4f}{f1_dt:<12.4f}")
+print(f"{'MLP':<20}{acc_mlp:<12.4f}{prec_mlp:<12.4f}{rec_mlp:<12.4f}{f1_mlp:<12.4f}")
+print(f"{'CNN (VGG11)':<20}{acc_cnn:<12.4f}{prec_cnn:<12.4f}{rec_cnn:<12.4f}{f1_cnn:<12.4f}")
