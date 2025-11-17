@@ -62,6 +62,25 @@ This project implements four different machine learning models to classify image
 ## How to Run
 
 ### **1. Create & activate virtual environment**
+   python3 -m venv venv
+   source venv/bin/activate
+
+### **1. Install dependencies
+   pip install torch torchvision numpy matplotlib scikit-learn
+
+### **1. Download CIFAR-10
+   python3 dataset_setup.py
+
+### **1. Extract features (for NB/DT/MLP)
+   python3 feature_extraction.py
+
+### **1. Run any model
+   python3 MLP.py
+   python3 CNN.py
+   python3 DecisionTree.py
+   python3 NaiveBayes.py
+   python3 main.py
+
 ```bash
 python3 -m venv venv
 source venv/bin/activate
