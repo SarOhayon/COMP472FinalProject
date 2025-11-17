@@ -11,7 +11,7 @@ This project implements four different machine learning models to classify image
 
 ---
 
-## 🧠 Models Implemented
+## Models Implemented
 
 ### **1. Naive Bayes (GaussianNB)**
 - Trained on PCA-reduced ResNet-18 feature vectors  
@@ -45,7 +45,7 @@ This project implements four different machine learning models to classify image
 
 ---
 
-## 📊 Final Results Summary
+## Final Results Summary
 
 | Model | Accuracy | Precision | Recall | F1-Score |
 |-------|----------|-----------|--------|----------|
@@ -59,7 +59,7 @@ This project implements four different machine learning models to classify image
 
 ---
 
-## ▶️ How to Run
+## How to Run
 
 ### **1. Create & activate virtual environment**
 ```bash
